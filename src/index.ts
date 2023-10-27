@@ -1,15 +1,15 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { TAccountDB, TAccountDBPost, TUserDB, TUserDBPost } from './types';
-import { db } from './database/knex';
 import { User } from './models/User';
 import { Account } from './models/Account';
+import { UserDatabase } from './database/UserDatabase';
+import { AccountDatabase } from './database/AccountDatabase';
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-
 app.listen(3003, () => {
     console.log(`Servidor rodando na porta ${3003}`);
 });
@@ -32,23 +32,25 @@ app.get('/ping', async (req: Request, res: Response) => {
     }
 });
 
+// --------> users:
+
+// GET /users
 app.get('/users', async (req: Request, res: Response) => {
     try {
-        const q = req.query.q;
+        const q = req.query.q as string;
 
-        let usersDB;
+        // let usersDB
 
-        if (q) {
-            const result: TUserDB[] = await db('users').where(
-                'name',
-                'LIKE',
-                `%${q}%`
-            );
-            usersDB = result;
-        } else {
-            const result: TUserDB[] = await db('users');
-            usersDB = result;
-        }
+        // if (q) {
+        //     const result: TUserDB[] = await db("users").where("name", "LIKE", `%${q}%`)
+        //     usersDB = result
+        // } else {
+        //     const result: TUserDB[] = await db("users")
+        //     usersDB = result
+        // }
+
+        const userDatabase = new UserDatabase();
+        const usersDB = await userDatabase.findUsers(q);
 
         const users: User[] = usersDB.map(
             (userDB) =>
@@ -77,6 +79,7 @@ app.get('/users', async (req: Request, res: Response) => {
     }
 });
 
+// POST /users
 app.post('/users', async (req: Request, res: Response) => {
     try {
         const { id, name, email, password } = req.body;
@@ -101,9 +104,12 @@ app.post('/users', async (req: Request, res: Response) => {
             throw new Error("'password' deve ser string");
         }
 
-        const [userDBExists]: TUserDB[] | undefined[] = await db('users').where(
-            { id }
-        );
+        // const [userDBExists]: TUserDB[] | undefined[] = await db('users').where(
+        //     { id }
+        // );
+
+        const userDatabase = new UserDatabase();
+        const userDBExists = await userDatabase.findUserById(id);
 
         if (userDBExists) {
             res.status(400);
@@ -126,7 +132,8 @@ app.post('/users', async (req: Request, res: Response) => {
             created_at: newUser.getCreatedAt(),
         };
 
-        await db('users').insert(newUserDB);
+        // await db('users').insert(newUserDB);
+        await userDatabase.insertUser(newUserDB);
 
         res.status(201).send(newUser);
     } catch (error) {
@@ -144,9 +151,19 @@ app.post('/users', async (req: Request, res: Response) => {
     }
 });
 
+// --------> accounts:
+
+// GET /accounts
 app.get('/accounts', async (req: Request, res: Response) => {
     try {
-        const accountsDB: TAccountDB[] = await db('accounts');
+        const q = req.query.q as string;
+        // const accountsDB: TAccountDB[] = await db('accounts');
+
+        // const userDatabase = new UserDatabase();
+        // const usersDB = await userDatabase.findUsers(q);
+
+        const accountDatabase = new AccountDatabase();
+        const accountsDB = await accountDatabase.findAccounts(q);
 
         const accounts = accountsDB.map(
             (accountDB) =>
@@ -174,13 +191,17 @@ app.get('/accounts', async (req: Request, res: Response) => {
     }
 });
 
+// GET /accounts/:id/balance
 app.get('/accounts/:id/balance', async (req: Request, res: Response) => {
     try {
         const id = req.params.id;
 
-        const [accountDB]: TAccountDB[] | undefined[] = await db(
-            'accounts'
-        ).where({ id });
+        // const [accountDB]: TAccountDB[] | undefined[] = await db(
+        //     'accounts'
+        // ).where({ id });
+
+        const accountDatabase = new AccountDatabase();
+        const accountDB = await accountDatabase.findAccountById(id);
 
         if (!accountDB) {
             res.status(404);
@@ -212,6 +233,7 @@ app.get('/accounts/:id/balance', async (req: Request, res: Response) => {
     }
 });
 
+// POST /accounts
 app.post('/accounts', async (req: Request, res: Response) => {
     try {
         const { id, ownerId } = req.body;
@@ -226,9 +248,12 @@ app.post('/accounts', async (req: Request, res: Response) => {
             throw new Error("'ownerId' deve ser string");
         }
 
-        const [accountDBExists]: TAccountDB[] | undefined[] = await db(
-            'accounts'
-        ).where({ id });
+        // const [accountDBExists]: TAccountDB[] | undefined[] = await db(
+        //     'accounts'
+        // ).where({ id });
+
+        const accountDatabase = new AccountDatabase();
+        const accountDBExists = await accountDatabase.findAccountById(id);
 
         if (accountDBExists) {
             res.status(400);
@@ -249,7 +274,9 @@ app.post('/accounts', async (req: Request, res: Response) => {
             created_at: newAccount.getCreatedAt(),
         };
 
-        await db('accounts').insert(newAccountDB);
+        // await db('accounts').insert(newAccountDB);
+
+        await accountDatabase.insertAccount(newAccountDB);
 
         res.status(201).send(newAccount);
     } catch (error) {
@@ -267,6 +294,7 @@ app.post('/accounts', async (req: Request, res: Response) => {
     }
 });
 
+// PUT /accounts/:id/balance
 app.put('/accounts/:id/balance', async (req: Request, res: Response) => {
     try {
         const id = req.params.id;
@@ -277,9 +305,12 @@ app.put('/accounts/:id/balance', async (req: Request, res: Response) => {
             throw new Error("'value' deve ser number");
         }
 
-        const [accountDB]: TAccountDB[] | undefined[] = await db(
-            'accounts'
-        ).where({ id });
+        // const [accountDB]: TAccountDB[] | undefined[] = await db(
+        //     'accounts'
+        // ).where({ id });
+
+        const accountDatabase = new AccountDatabase();
+        const accountDB = await accountDatabase.findAccountById(id);
 
         if (!accountDB) {
             res.status(404);
@@ -296,7 +327,9 @@ app.put('/accounts/:id/balance', async (req: Request, res: Response) => {
         const newBalance = account.getBalance() + value;
         account.setBalance(newBalance);
 
-        await db('accounts').update({ balance: newBalance }).where({ id });
+        // await db('accounts').update({ balance: newBalance }).where({ id });
+
+        await accountDatabase.updateBalance(id, newBalance);
 
         res.status(200).send(account);
     } catch (error) {
